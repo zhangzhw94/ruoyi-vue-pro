@@ -46,6 +46,10 @@ public class MemberUserDO extends TenantBaseDO {
      */
     private String mobile;
     /**
+     * 邮箱
+     */
+    private String email;
+    /**
      * 加密后的密码
      *
      * 因为目前使用 {@link BCryptPasswordEncoder} 加密器，所以无需自己处理 salt 盐
@@ -81,6 +85,10 @@ public class MemberUserDO extends TenantBaseDO {
      * 用户昵称
      */
     private String nickname;
+    /**
+     * 个人简介
+     */
+    private String introduction;
     /**
      * 用户头像
      */

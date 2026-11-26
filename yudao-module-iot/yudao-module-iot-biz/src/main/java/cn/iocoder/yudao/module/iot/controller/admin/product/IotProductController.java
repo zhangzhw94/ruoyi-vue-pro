@@ -10,6 +10,9 @@ import cn.iocoder.yudao.framework.excel.core.util.ExcelUtils;
 import cn.iocoder.yudao.module.iot.controller.admin.product.vo.product.IotProductPageReqVO;
 import cn.iocoder.yudao.module.iot.controller.admin.product.vo.product.IotProductRespVO;
 import cn.iocoder.yudao.module.iot.controller.admin.product.vo.product.IotProductSaveReqVO;
+import cn.iocoder.yudao.module.iot.controller.admin.product.vo.product.IotProductScriptDebugReqVO;
+import cn.iocoder.yudao.module.iot.controller.admin.product.vo.product.IotProductScriptDebugRespVO;
+import cn.iocoder.yudao.module.iot.controller.admin.product.vo.product.IotProductScriptUpdateReqVO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.product.IotProductCategoryDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.product.IotProductDO;
 import cn.iocoder.yudao.module.iot.service.product.IotProductCategoryService;
@@ -67,6 +70,22 @@ public class IotProductController {
                                                      @RequestParam("status") Integer status) {
         productService.updateProductStatus(id, status);
         return success(true);
+    }
+
+    @PutMapping("/update-script")
+    @Operation(summary = "更新产品数据解析脚本", description = "部分更新：只修改本次提交的字段；保存即生效")
+    @PreAuthorize("@ss.hasPermission('iot:product:update')")
+    public CommonResult<Boolean> updateProductScript(@Valid @RequestBody IotProductScriptUpdateReqVO updateReqVO) {
+        productService.updateProductScript(updateReqVO);
+        return success(true);
+    }
+
+    @PostMapping("/debug-script")
+    @Operation(summary = "调试产品数据解析脚本", description = "执行当前编辑内容；不保存、不发消息、不改属性")
+    @PreAuthorize("@ss.hasPermission('iot:product:update')")
+    public CommonResult<IotProductScriptDebugRespVO> debugProductScript(
+            @Valid @RequestBody IotProductScriptDebugReqVO debugReqVO) {
+        return success(productService.debugProductScript(debugReqVO));
     }
 
     @DeleteMapping("/delete")
@@ -141,13 +160,23 @@ public class IotProductController {
                 result.getData().getList());
     }
 
+    @PostMapping("/sync-property-table")
+    @Operation(summary = "同步产品属性表结构到 TDengine")
+    @PreAuthorize("@ss.hasPermission('iot:product:update')")
+    public CommonResult<Boolean> syncProductPropertyTable(@RequestParam("id") Long id) {
+        productService.syncProductPropertyTable(id);
+        return success(true);
+    }
+
     @GetMapping("/simple-list")
     @Operation(summary = "获取产品的精简信息列表", description = "主要用于前端的下拉选项")
-    public CommonResult<List<IotProductRespVO>> getProductSimpleList() {
-        List<IotProductDO> list = productService.getProductList();
-        return success(convertList(list, product -> // 只返回 id、name 字段
+    @Parameter(name = "deviceType", description = "设备类型", example = "1")
+    public CommonResult<List<IotProductRespVO>> getProductSimpleList(
+            @RequestParam(value = "deviceType", required = false) Integer deviceType) {
+        List<IotProductDO> list = productService.getProductList(deviceType);
+        return success(convertList(list, product -> // 只返回 id、name、productKey 字段
                 new IotProductRespVO().setId(product.getId()).setName(product.getName()).setStatus(product.getStatus())
-                        .setDeviceType(product.getDeviceType()).setLocationType(product.getLocationType())));
+                        .setDeviceType(product.getDeviceType()).setProductKey(product.getProductKey())));
     }
 
 }

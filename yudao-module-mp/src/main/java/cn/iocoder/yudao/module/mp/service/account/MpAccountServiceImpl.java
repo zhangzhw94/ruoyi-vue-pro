@@ -4,6 +4,7 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.ObjUtil;
 import cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.framework.common.util.jdbc.JdbcExceptionUtils;
 import cn.iocoder.yudao.framework.tenant.core.util.TenantUtils;
 import cn.iocoder.yudao.module.mp.controller.admin.account.vo.MpAccountCreateReqVO;
 import cn.iocoder.yudao.module.mp.controller.admin.account.vo.MpAccountPageReqVO;
@@ -60,7 +61,7 @@ public class MpAccountServiceImpl implements MpAccountService {
     private MpAccountMapper mpAccountMapper;
 
     @Resource
-    @Lazy // 延迟加载，解决循环依赖的问题
+    @Lazy // 延迟加载，解决循环依赖
     private MpServiceFactory mpServiceFactory;
 
     @Override
@@ -73,7 +74,7 @@ public class MpAccountServiceImpl implements MpAccountService {
             try {
                 accounts = mpAccountMapper.selectList();
             } catch (Throwable ex) {
-                if (!ex.getMessage().contains("doesn't exist")) {
+                if (!JdbcExceptionUtils.isTableNotExists(ex)) {
                     throw ex;
                 }
                 log.error("[微信公众号 yudao-module-mp - 表结构未导入][参考 https://doc.iocoder.cn/mp/build/ 开启]");

@@ -11,7 +11,7 @@ import lombok.NoArgsConstructor;
 /**
  * IoT 设备消息数据 DO
  *
- * 目前使用 TDengine 存储
+ * 支持 TDengine、IoTDB、QuestDB 存储，由 yudao.iot.storage.type 选择
  *
  * @author alwayssuper
  */
@@ -84,7 +84,7 @@ public class IotDeviceMessageDO {
      * 请求方法
      *
      * 枚举 {@link IotDeviceMessageMethodEnum}
-     * 例如说：thing.property.report 属性上报
+     * 例如说：thing.property.post 属性上报
      */
     private String method;
     /**
@@ -105,5 +105,14 @@ public class IotDeviceMessageDO {
      * 响应提示
      */
     private String msg;
+
+    // ========== 透传（raw）字段 ==========
+
+    /**
+     * 与设备之间实际收发的原始字节（Base64）
+     *
+     * 只由服务端可信赋值，见 {@link IotDeviceMessage#getRaw()}；为空表示没有原始帧
+     */
+    private String raw;
 
 }

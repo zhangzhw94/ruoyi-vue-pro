@@ -16,8 +16,8 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.annotation.Resource;
-import jakarta.validation.Valid;
+import javax.annotation.Resource;
+import javax.validation.Valid;
 import org.hibernate.validator.constraints.URL;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
@@ -80,6 +80,15 @@ public class AiKnowledgeSegmentController {
     public CommonResult<Boolean> updateKnowledgeSegmentStatus(
             @Valid @RequestBody AiKnowledgeSegmentUpdateStatusReqVO reqVO) {
         segmentService.updateKnowledgeSegmentStatus(reqVO);
+        return success(true);
+    }
+
+    @DeleteMapping("/delete")
+    @Operation(summary = "删除段落")
+    @Parameter(name = "id", description = "段落编号", required = true, example = "1024")
+    @PreAuthorize("@ss.hasPermission('ai:knowledge:delete')")
+    public CommonResult<Boolean> deleteKnowledgeSegment(@RequestParam("id") Long id) {
+        segmentService.deleteKnowledgeSegment(id);
         return success(true);
     }
 

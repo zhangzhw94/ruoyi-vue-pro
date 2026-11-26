@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.system.service.tenant;
 
+import cn.hutool.core.util.ReflectUtil;
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.tenant.config.TenantProperties;
@@ -21,7 +22,6 @@ import cn.iocoder.yudao.module.system.service.tenant.handler.TenantInfoHandler;
 import cn.iocoder.yudao.module.system.service.tenant.handler.TenantMenuHandler;
 import cn.iocoder.yudao.module.system.service.user.AdminUserService;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
@@ -334,7 +334,6 @@ public class TenantServiceImplTest extends BaseDbUnitTest {
     }
 
     @Test
-    @Disabled // H2 不支持 find_in_set 函数
     public void testGetTenantByWebsite() {
         // mock 数据
         TenantDO dbTenant = randomPojo(TenantDO.class, o -> o.setWebsites(singletonList("https://www.iocoder.cn")));
@@ -371,6 +370,24 @@ public class TenantServiceImplTest extends BaseDbUnitTest {
         // 调用
         Long count = tenantService.getTenantCountByPackageId(1L);
         assertEquals(1, count);
+    }
+
+    @Test
+    public void testHandleTenant_missingProperties_skipsHandlers() {
+        // 准备参数
+        TenantInfoHandler infoHandler = mock(TenantInfoHandler.class);
+        TenantMenuHandler menuHandler = mock(TenantMenuHandler.class);
+        // mock 关闭多租户后，可选的配置属性未注入
+        ReflectUtil.setFieldValue(tenantService, "tenantProperties", null);
+        try {
+            // 调用
+            tenantService.handleTenantInfo(infoHandler);
+            tenantService.handleTenantMenu(menuHandler);
+            // 断言
+            verifyNoInteractions(infoHandler, menuHandler);
+        } finally {
+            ReflectUtil.setFieldValue(tenantService, "tenantProperties", tenantProperties);
+        }
     }
 
     @Test

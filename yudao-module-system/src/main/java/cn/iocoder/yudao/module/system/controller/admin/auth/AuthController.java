@@ -2,9 +2,11 @@ package cn.iocoder.yudao.module.system.controller.admin.auth;
 
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
+import cn.iocoder.yudao.framework.apilog.core.annotation.ApiAccessLog;
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
+import cn.iocoder.yudao.framework.datapermission.core.annotation.DataPermission;
 import cn.iocoder.yudao.framework.security.config.SecurityProperties;
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
 import cn.iocoder.yudao.module.system.controller.admin.auth.vo.*;
@@ -13,6 +15,7 @@ import cn.iocoder.yudao.module.system.dal.dataobject.permission.MenuDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.permission.RoleDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
 import cn.iocoder.yudao.module.system.enums.logger.LoginLogTypeEnum;
+import cn.iocoder.yudao.module.system.service.auth.AdminAuthQrcodeService;
 import cn.iocoder.yudao.module.system.service.auth.AdminAuthService;
 import cn.iocoder.yudao.module.system.service.permission.MenuService;
 import cn.iocoder.yudao.module.system.service.permission.PermissionService;
@@ -23,7 +26,6 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -43,11 +45,12 @@ import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUti
 @RestController
 @RequestMapping("/system/auth")
 @Validated
-@Slf4j
 public class AuthController {
 
     @Resource
     private AdminAuthService authService;
+    @Resource
+    private AdminAuthQrcodeService authQrcodeService;
     @Resource
     private AdminUserService userService;
     @Resource
@@ -91,6 +94,7 @@ public class AuthController {
 
     @GetMapping("/get-permission-info")
     @Operation(summary = "获取登录用户的权限信息")
+    @DataPermission(enable = false) // 忽略数据权限，避免因为过滤，导致无法查询用户。类似：https://t.zsxq.com/LHnrp
     public CommonResult<AuthPermissionInfoRespVO> getPermissionInfo() {
         // 1.1 获得用户信息
         AdminUserDO user = userService.getUser(getLoginUserId());
@@ -169,6 +173,31 @@ public class AuthController {
     @Operation(summary = "社交快捷登录，使用 code 授权码", description = "适合未登录的用户，但是社交账号已绑定用户")
     public CommonResult<AuthLoginRespVO> socialQuickLogin(@RequestBody @Valid AuthSocialLoginReqVO reqVO) {
         return success(authService.socialLogin(reqVO));
+    }
+
+    // ========== 扫码登录相关 ==========
+
+    @PostMapping("/create-qrcode")
+    @PermitAll
+    @ApiAccessLog(requestEnable = false, responseEnable = false)
+    @Operation(summary = "生成扫码登录二维码")
+    public CommonResult<AuthQrcodeCreateRespVO> createAuthQrcode() {
+        return success(authQrcodeService.createAuthQrcode());
+    }
+
+    @PostMapping("/confirm-qrcode")
+    @Operation(summary = "手机确认扫码登录")
+    public CommonResult<Boolean> confirmAuthQrcode(@RequestBody @Valid AuthQrcodeConfirmReqVO reqVO) {
+        authQrcodeService.confirmAuthQrcode(reqVO.getQrcodeId(), getLoginUserId());
+        return success(true);
+    }
+
+    @PostMapping("/qrcode-login")
+    @PermitAll
+    @ApiAccessLog(requestEnable = false, responseEnable = false)
+    @Operation(summary = "电脑轮询领取扫码登录结果")
+    public CommonResult<AuthQrcodePollRespVO> qrcodeLogin(@RequestBody @Valid AuthQrcodePollReqVO reqVO) {
+        return success(authService.qrcodeLogin(reqVO));
     }
 
 }

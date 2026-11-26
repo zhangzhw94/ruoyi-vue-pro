@@ -1,9 +1,9 @@
 package cn.iocoder.yudao.module.ai.controller.admin.model.vo.chatRole;
 
 import cn.iocoder.yudao.module.ai.dal.dataobject.model.AiModelDO;
-import com.fhs.core.trans.anno.Trans;
-import com.fhs.core.trans.constant.TransType;
-import com.fhs.core.trans.vo.VO;
+import org.dromara.core.trans.anno.Trans;
+import org.dromara.core.trans.constant.TransType;
+import org.dromara.core.trans.vo.VO;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
@@ -54,6 +54,9 @@ public class AiChatRoleRespVO implements VO {
 
     @Schema(description = "引用的 MCP Client 名字列表", example = "filesystem")
     private List<String> mcpClientNames;
+
+    @Schema(description = "引用的技能编号列表", example = "1,2,3")
+    private List<Long> skillIds;
 
     @Schema(description = "是否公开", requiredMode = Schema.RequiredMode.REQUIRED, example = "1")
     private Boolean publicStatus;

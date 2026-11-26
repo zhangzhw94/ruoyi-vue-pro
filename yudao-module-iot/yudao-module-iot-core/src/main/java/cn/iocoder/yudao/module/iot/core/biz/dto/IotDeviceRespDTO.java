@@ -34,8 +34,20 @@ public class IotDeviceRespDTO {
      */
     private Long productId;
     /**
-     * 编解码器类型
+     * 协议类型
      */
-    private String codecType;
+    private String protocolType;
+    /**
+     * 序列化类型
+     */
+    private String serializeType;
+    /**
+     * 是否启用数据解析脚本
+     */
+    private Boolean scriptEnabled;
+    /**
+     * 数据解析脚本（JS ES5）：只在启用时返回
+     */
+    private String scriptContent;
 
 }

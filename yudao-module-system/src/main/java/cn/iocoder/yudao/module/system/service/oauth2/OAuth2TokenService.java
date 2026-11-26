@@ -4,6 +4,7 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.system.controller.admin.oauth2.vo.token.OAuth2AccessTokenPageReqVO;
 import cn.iocoder.yudao.module.system.dal.dataobject.oauth2.OAuth2AccessTokenDO;
 
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -81,6 +82,13 @@ public interface OAuth2TokenService {
     void removeAccessToken(Long userId, Integer userType);
 
     /**
+     * 在账号禁用或删除的读已提交事务中，移除后台用户的访问令牌、刷新令牌和授权码
+     *
+     * @param userIds 用户编号列表
+     */
+    void removeAdminUserTokens(Collection<Long> userIds);
+
+    /**
      * 获得访问令牌分页
      *
      * @param reqVO 请求
@@ -88,4 +96,19 @@ public interface OAuth2TokenService {
      */
     PageResult<OAuth2AccessTokenDO> getAccessTokenPage(OAuth2AccessTokenPageReqVO reqVO);
 
+    /**
+     * 清理过期 exceedDay 天的刷新令牌
+     *
+     * @param exceedDay   过期多少天就进行清理
+     * @param deleteLimit 清理的间隔条数
+     */
+    Integer cleanRefreshToken(Integer exceedDay, Integer deleteLimit);
+
+    /**
+     * 清理过期 exceedDay 天的访问令牌
+     *
+     * @param exceedDay   过期多少天就进行清理
+     * @param deleteLimit 清理的间隔条数
+     */
+    Integer cleanAccessToken(Integer exceedDay, Integer deleteLimit);
 }

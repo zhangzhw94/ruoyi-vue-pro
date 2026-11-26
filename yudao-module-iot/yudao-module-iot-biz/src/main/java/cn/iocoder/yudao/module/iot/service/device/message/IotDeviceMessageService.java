@@ -9,7 +9,6 @@ import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceDO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.device.IotDeviceMessageDO;
 
 import javax.annotation.Nullable;
-import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -22,13 +21,6 @@ import java.util.List;
 public interface IotDeviceMessageService {
 
     /**
-     * 初始化设备消息的 TDengine 超级表
-     *
-     * 系统启动时，会自动初始化一次
-     */
-    void defineDeviceMessageStable();
-
-    /**
      * 发送设备消息
      *
      * @param message 消息（“codec（编解码）字段” 部分字段）
@@ -36,6 +28,30 @@ public interface IotDeviceMessageService {
      * @return 设备消息
      */
     IotDeviceMessage sendDeviceMessage(IotDeviceMessage message, IotDeviceDO device);
+
+    /**
+     * 发送设备消息（指定 serverId，用于上行回复等场景）
+     *
+     * @param message  消息
+     * @param device   设备
+     * @param serverId 网关 serverId
+     * @return 设备消息
+     */
+    IotDeviceMessage sendDeviceMessage(IotDeviceMessage message, IotDeviceDO device, String serverId);
+
+    /**
+     * 发送设备消息（指定事件时间）
+     *
+     * 用于 biz 派生的消息沿用源事件的时间，例如说：强制上线、网关下线联动子设备、离线检测。仅供内部调用，不对外暴露
+     *
+     * @param message   消息
+     * @param device    设备
+     * @param serverId  网关 serverId
+     * @param eventTime 事件时间，作为消息的 reportTime；为空时使用当前时间
+     * @return 设备消息
+     */
+    IotDeviceMessage sendDeviceMessage(IotDeviceMessage message, IotDeviceDO device, String serverId,
+                                       @Nullable LocalDateTime eventTime);
 
     /**
      * 发送设备消息
@@ -75,7 +91,7 @@ public interface IotDeviceMessageService {
      */
     List<IotDeviceMessageDO> getDeviceMessageListByRequestIdsAndReply(
             @NotNull(message = "设备编号不能为空") Long deviceId,
-            @NotEmpty(message = "请求编号不能为空") List<String> requestIds,
+            List<String> requestIds,
             Boolean reply);
 
     /**

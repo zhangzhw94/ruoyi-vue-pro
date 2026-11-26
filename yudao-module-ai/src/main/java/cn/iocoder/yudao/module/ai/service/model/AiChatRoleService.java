@@ -5,7 +5,7 @@ import cn.iocoder.yudao.module.ai.controller.admin.model.vo.chatRole.AiChatRoleP
 import cn.iocoder.yudao.module.ai.controller.admin.model.vo.chatRole.AiChatRoleSaveMyReqVO;
 import cn.iocoder.yudao.module.ai.controller.admin.model.vo.chatRole.AiChatRoleSaveReqVO;
 import cn.iocoder.yudao.module.ai.dal.dataobject.model.AiChatRoleDO;
-import jakarta.validation.Valid;
+import javax.validation.Valid;
 
 import java.util.Collection;
 import java.util.List;
@@ -125,5 +125,13 @@ public interface AiChatRoleService {
      * @return 聊天角色列表
      */
     List<AiChatRoleDO> getChatRoleListByName(String name);
+
+    /**
+     * 获得引用了指定技能的聊天角色列表
+     *
+     * @param skillIds 技能编号集合
+     * @return 聊天角色列表
+     */
+    List<AiChatRoleDO> getChatRoleListBySkillIds(Collection<Long> skillIds);
 
 }

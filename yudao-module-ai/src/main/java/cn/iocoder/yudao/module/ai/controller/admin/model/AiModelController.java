@@ -12,8 +12,8 @@ import cn.iocoder.yudao.module.ai.service.model.AiModelService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.annotation.Resource;
-import jakarta.validation.Valid;
+import javax.annotation.Resource;
+import javax.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -75,15 +75,17 @@ public class AiModelController {
 
     @GetMapping("/simple-list")
     @Operation(summary = "获得模型列表")
-    @Parameter(name = "type", description = "类型", required = true, example = "1")
+    @Parameter(name = "type", description = "类型，为空时返回全部类型", example = "1")
     @Parameter(name = "platform", description = "平台", example = "midjourney")
     public CommonResult<List<AiModelRespVO>> getModelSimpleList(
-            @RequestParam("type") Integer type,
+            @RequestParam(value = "type", required = false) Integer type,
             @RequestParam(value = "platform", required = false) String platform) {
         List<AiModelDO> list = modelService.getModelListByStatusAndType(
                 CommonStatusEnum.ENABLE.getStatus(), type, platform);
         return success(convertList(list, model -> new AiModelRespVO().setId(model.getId())
-                .setName(model.getName()).setModel(model.getModel()).setPlatform(model.getPlatform())));
+                .setName(model.getName()).setModel(model.getModel()).setPlatform(model.getPlatform())
+                .setDescription(model.getDescription()).setIconUrl(model.getIconUrl())
+                .setInputModalities(model.getInputModalities())));
     }
 
 }
