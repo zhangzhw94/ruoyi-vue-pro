@@ -8,7 +8,7 @@ import { ref } from 'vue';
 import {#if ($table.templateType != 2 && $deleteBatchEnable) confirm,#end Page, useVbenModal } from '@vben/common-ui';
 import { downloadFileFromBlobPart#if ($table.templateType != 2 && $deleteBatchEnable), isEmpty#end } from '@vben/utils';
 
-import { ElLoading, ElMessage#if ($table.templateType == 11), ElTabs, ElTabPane#end } from 'element-plus';
+import { ElLoading, ElMessage#if ($table.templateType == 11 || $table.templateType == 12), ElTabs, ElTabPane#end } from 'element-plus';
 
 import { ACTION_ICON, TableAction, useVbenVxeGrid } from '#/adapter/vxe-table';
 #if (${table.templateType} == 2)## 树表接口
@@ -25,6 +25,9 @@ import {
   export${simpleClassName},
   get${simpleClassName}Page,
 } from '#/api/${table.moduleName}/${table.businessName}';
+#end
+#if ($importEnable)
+import ${simpleClassName}Import from './modules/import-form.vue';
 #end
 import { $t } from '#/locales';
 
@@ -50,6 +53,17 @@ const [FormModal, formModalApi] = useVbenModal({
   connectedComponent: Form,
   destroyOnClose: true,
 });
+#if ($importEnable)
+const [ImportFormModal, importFormModalApi] = useVbenModal({
+  connectedComponent: ${simpleClassName}Import,
+  destroyOnClose: true,
+});
+
+/** 导入${table.classComment} */
+function handleImport() {
+  importFormModalApi.open();
+}
+#end
 #if (${table.templateType} == 2)## 树表特有：控制表格展开收缩
 
 /** 切换树形展开/收缩状态 */
@@ -133,6 +147,7 @@ async function handleExport() {
   downloadFileFromBlobPart({ fileName: '${table.classComment}.xls', source: data });
 }
 
+
 const [Grid, gridApi] = useVbenVxeGrid({
   formOptions: {
     schema: useGridFormSchema(),
@@ -208,6 +223,9 @@ const [Grid, gridApi] = useVbenVxeGrid({
 <template>
   <Page auto-content-height>
     <FormModal @success="handleRefresh" />
+#if ($importEnable)
+    <ImportFormModal @success="handleRefresh" />
+#end
 #if ($table.templateType == 11) ## erp情况
   <div>
 #end
@@ -245,6 +263,14 @@ const [Grid, gridApi] = useVbenVxeGrid({
               onClick: handleExpand,
             },
             #end
+#if ($importEnable)
+            {
+              label: '导入',
+              type: 'primary',
+              auth: ['${table.moduleName}:${simpleClassName_strikeCase}:import'],
+              onClick: handleImport,
+            },
+#end
             {
               label: $t('ui.actionTitle.export'),
               type: 'primary',

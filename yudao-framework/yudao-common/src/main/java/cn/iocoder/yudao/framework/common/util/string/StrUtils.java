@@ -3,6 +3,7 @@ package cn.iocoder.yudao.framework.common.util.string;
 import cn.hutool.core.text.StrPool;
 import cn.hutool.core.util.ArrayUtil;
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.extra.pinyin.PinyinUtil;
 import org.aspectj.lang.JoinPoint;
 
 import java.util.Arrays;
@@ -76,6 +77,44 @@ public class StrUtils {
         return Arrays.stream(content.split("\n"))
                 .filter(line -> !line.contains(sequence))
                 .collect(Collectors.joining("\n"));
+    }
+
+    /**
+     * 姓名脱敏：去除首尾空白后保留首字，其余每个字替换为 *；单字姓名为首字加 *
+     *
+     * 例：「张三」→ "张*"、「欧阳娜娜」→ "欧***"、「张」→ "张*"
+     *
+     * @param name 姓名
+     * @return 脱敏后的姓名；为空时返回空字符串
+     */
+    public static String maskName(String name) {
+        String value = StrUtil.trim(name);
+        if (StrUtil.isEmpty(value)) {
+            return "";
+        }
+        // 按码点截取首字，避免把生僻字等代理对拆开
+        int firstEnd = value.offsetByCodePoints(0, 1);
+        int restCount = value.codePointCount(firstEnd, value.length());
+        return value.substring(0, firstEnd) + StrUtil.repeat('*', Math.max(restCount, 1));
+    }
+
+    /**
+     * 转小写拼音，字之间以空格分隔，便于调用方按需拼接 / 取首字母 / 拼音搜索
+     *
+     * 例：「老张」→ "lao zhang"、「ZhangSan」→ "zhangsan"
+     * 英文 / 数字 / 符号原样返回，空值返回 null
+     *
+     * 注意：底层依赖 hutool-extra 的 {@link PinyinUtil}，需要业务模块自行引入拼音引擎依赖
+     * （pinyin4j / TinyPinyin / Bopomofo4j 任选其一），否则运行时会抛 NoClassDefFoundError
+     *
+     * @param str 字符串
+     * @return 拼音串（保留空格分隔）
+     */
+    public static String toPinyin(String str) {
+        if (StrUtil.isBlank(str)) {
+            return null;
+        }
+        return PinyinUtil.getPinyin(str);
     }
 
     /**

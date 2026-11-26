@@ -14,7 +14,7 @@ import cn.iocoder.yudao.module.bpm.dal.dataobject.task.BpmProcessInstanceCopyDO;
 import cn.iocoder.yudao.module.bpm.framework.flowable.core.util.FlowableUtils;
 import cn.iocoder.yudao.module.bpm.service.definition.BpmProcessDefinitionService;
 import cn.iocoder.yudao.module.bpm.service.task.BpmProcessInstanceCopyService;
-import cn.iocoder.yudao.module.bpm.service.task.BpmProcessInstanceService;
+import cn.iocoder.yudao.module.bpm.service.task.BpmProcessInstanceQueryService;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import io.swagger.v3.oas.annotations.Operation;
@@ -44,7 +44,7 @@ public class BpmProcessInstanceCopyController {
     @Resource
     private BpmProcessInstanceCopyService processInstanceCopyService;
     @Resource
-    private BpmProcessInstanceService processInstanceService;
+    private BpmProcessInstanceQueryService processInstanceQueryService;
     @Resource
     private BpmProcessDefinitionService processDefinitionService;
 
@@ -63,18 +63,19 @@ public class BpmProcessInstanceCopyController {
         }
 
         // 拼接返回
-        Map<String, HistoricProcessInstance> processInstanceMap = processInstanceService.getHistoricProcessInstanceMap(
+        Map<String, HistoricProcessInstance> processInstanceMap = processInstanceQueryService.getHistoricProcessInstanceMap(
                 convertSet(pageResult.getList(), BpmProcessInstanceCopyDO::getProcessInstanceId));
+
         Map<Long, AdminUserRespDTO> userMap = adminUserApi.getUserMap(convertListByFlatMap(pageResult.getList(),
-                copy -> Stream.of(copy.getStartUserId(), Long.parseLong(copy.getCreator()))));
+                copy -> Stream.of(copy.getStartUserId(), copy.getUserId())));
         Map<String, BpmProcessDefinitionInfoDO> processDefinitionInfoMap = processDefinitionService.getProcessDefinitionInfoMap(
                 convertSet(pageResult.getList(), BpmProcessInstanceCopyDO::getProcessDefinitionId));
         return success(convertPage(pageResult, copy -> {
             BpmProcessInstanceCopyRespVO copyVO = BeanUtils.toBean(copy, BpmProcessInstanceCopyRespVO.class);
-            MapUtils.findAndThen(userMap, Long.valueOf(copy.getCreator()),
-                    user -> copyVO.setStartUser(BeanUtils.toBean(user, UserSimpleBaseVO.class)));
-            MapUtils.findAndThen(userMap, copy.getStartUserId(),
+            MapUtils.findAndThen(userMap, copy.getUserId(),
                     user -> copyVO.setCreateUser(BeanUtils.toBean(user, UserSimpleBaseVO.class)));
+            MapUtils.findAndThen(userMap, copy.getStartUserId(),
+                    user -> copyVO.setStartUser(BeanUtils.toBean(user, UserSimpleBaseVO.class)));
             MapUtils.findAndThen(processInstanceMap, copyVO.getProcessInstanceId(),
                     processInstance -> {
                         copyVO.setSummary(FlowableUtils.getSummary(
@@ -85,5 +86,4 @@ public class BpmProcessInstanceCopyController {
             return copyVO;
         }));
     }
-
 }

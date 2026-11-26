@@ -38,7 +38,7 @@ public class IotDeviceMessageRespVO {
     @Schema(description = "请求编号", example = "req_123")
     private String requestId;
 
-    @Schema(description = "请求方法", requiredMode = Schema.RequiredMode.REQUIRED, example = "thing.property.report")
+    @Schema(description = "请求方法", requiredMode = Schema.RequiredMode.REQUIRED, example = "thing.property.post")
     private String method;
 
     @Schema(description = "请求参数")
@@ -52,5 +52,8 @@ public class IotDeviceMessageRespVO {
 
     @Schema(description = "响应提示", example = "操作成功")
     private String msg;
+
+    @Schema(description = "与设备实际收发的原始字节（Base64）；为空表示没有原始帧", example = "AQMAAAAK")
+    private String raw;
 
 }

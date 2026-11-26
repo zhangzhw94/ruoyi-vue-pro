@@ -3,6 +3,9 @@ package cn.iocoder.yudao.module.iot.service.product;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.iot.controller.admin.product.vo.product.IotProductPageReqVO;
 import cn.iocoder.yudao.module.iot.controller.admin.product.vo.product.IotProductSaveReqVO;
+import cn.iocoder.yudao.module.iot.controller.admin.product.vo.product.IotProductScriptDebugReqVO;
+import cn.iocoder.yudao.module.iot.controller.admin.product.vo.product.IotProductScriptDebugRespVO;
+import cn.iocoder.yudao.module.iot.controller.admin.product.vo.product.IotProductScriptUpdateReqVO;
 import cn.iocoder.yudao.module.iot.dal.dataobject.product.IotProductDO;
 import jakarta.validation.Valid;
 
@@ -10,6 +13,9 @@ import javax.annotation.Nullable;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
+
+import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.convertMap;
 
 /**
  * IoT 产品 Service 接口
@@ -32,6 +38,21 @@ public interface IotProductService {
      * @param updateReqVO 更新信息
      */
     void updateProduct(@Valid IotProductSaveReqVO updateReqVO);
+
+    /**
+     * 更新产品数据解析脚本：只修改非 null 的字段（脚本内容、是否启用），最后保存者生效
+     *
+     * @param updateReqVO 更新信息
+     */
+    void updateProductScript(@Valid IotProductScriptUpdateReqVO updateReqVO);
+
+    /**
+     * 调试产品数据解析脚本：执行当前编辑内容，不保存、不发消息、不改属性
+     *
+     * @param debugReqVO 调试信息
+     * @return 调试结果
+     */
+    IotProductScriptDebugRespVO debugProductScript(@Valid IotProductScriptDebugReqVO debugReqVO);
 
     /**
      * 删除产品
@@ -106,6 +127,14 @@ public interface IotProductService {
     List<IotProductDO> getProductList();
 
     /**
+     * 根据设备类型获得产品列表
+     *
+     * @param deviceType 设备类型（可选）
+     * @return 产品列表
+     */
+    List<IotProductDO> getProductList(@Nullable Integer deviceType);
+
+    /**
      * 获得产品数量
      *
      * @param createTime 创建时间，如果为空，则统计所有产品数量
@@ -114,10 +143,35 @@ public interface IotProductService {
     Long getProductCount(@Nullable LocalDateTime createTime);
 
     /**
+     * 批量获得产品列表
+     *
+     * @param ids 产品编号集合
+     * @return 产品列表
+     */
+    List<IotProductDO> getProductList(Collection<Long> ids);
+
+    /**
+     * 批量获得产品 Map
+     *
+     * @param ids 产品编号集合
+     * @return 产品 Map（key: 产品编号, value: 产品）
+     */
+    default Map<Long, IotProductDO> getProductMap(Collection<Long> ids) {
+        return convertMap(getProductList(ids), IotProductDO::getId);
+    }
+
+    /**
      * 批量校验产品存在
      *
      * @param ids 产品编号集合
      */
     void validateProductsExist(Collection<Long> ids);
+
+    /**
+     * 同步产品的 TDengine 表结构
+     *
+     * 目的：当 MySQL 和 TDengine 不同步时，强制将指定产品的表结构同步到 TDengine 中
+     */
+    void syncProductPropertyTable(Long id);
 
 }

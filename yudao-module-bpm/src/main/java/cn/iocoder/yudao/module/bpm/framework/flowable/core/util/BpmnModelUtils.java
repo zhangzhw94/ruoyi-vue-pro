@@ -123,7 +123,7 @@ public class BpmnModelUtils {
     public static Integer parseCandidateStrategy(FlowElement userTask) {
         Integer candidateStrategy = NumberUtils.parseInt(userTask.getAttributeValue(
                 BpmnModelConstants.NAMESPACE, BpmnModelConstants.USER_TASK_CANDIDATE_STRATEGY));
-        // TODO @芋艿 尝试从 ExtensionElement 取. 后续相关扩展是否都可以 存 extensionElement。 如表单权限。 按钮权限
+        // 兼容两种存储：老版本 BPMN 设计器存储在 flowable:candidateStrategy 属性中；SIMPLE 设计器、新版本 BPMN 设计器存储在扩展元素中（与表单权限、按钮设置一致）
         if (candidateStrategy == null) {
             ExtensionElement element = CollUtil.getFirst(userTask.getExtensionElements().get(BpmnModelConstants.USER_TASK_CANDIDATE_STRATEGY));
             candidateStrategy = element != null ? NumberUtils.parseInt(element.getElementText()) : null;
@@ -202,6 +202,27 @@ public class BpmnModelUtils {
      */
     public static String parseReturnTaskId(FlowElement flowElement) {
         return parseExtensionElement(flowElement, USER_TASK_REJECT_RETURN_TASK_ID);
+    }
+
+    /**
+     * 给用户任务添加退回后的审批方式
+     *
+     * @param returnApproveMode 退回后的审批方式，参见 {@link BpmReturnApproveModeEnum}
+     * @param userTask          用户任务
+     */
+    public static void addReturnApproveMode(Integer returnApproveMode, UserTask userTask) {
+        addExtensionElement(userTask, USER_TASK_RETURN_APPROVE_MODE, returnApproveMode);
+    }
+
+    /**
+     * 解析用户任务退回后的审批方式
+     *
+     * @param userTask 用户任务
+     * @return 退回后的审批方式；未配置时（例如说，历史版本的流程），默认为重新依次审批
+     */
+    public static BpmReturnApproveModeEnum parseReturnApproveMode(FlowElement userTask) {
+        Integer mode = NumberUtils.parseInt(parseExtensionElement(userTask, USER_TASK_RETURN_APPROVE_MODE));
+        return Optional.ofNullable(BpmReturnApproveModeEnum.typeOf(mode)).orElse(BpmReturnApproveModeEnum.RESTART);
     }
 
     /**
@@ -365,6 +386,26 @@ public class BpmnModelUtils {
         return Optional.ofNullable(extensionElement).map(ExtensionElement::getElementText).orElse(null);
     }
 
+    /**
+     * 解析用户任务审批超时【自动跳转】的目标节点，记录在用户任务的超时边界事件上
+     * <p>
+     * 同一个用户任务，可能有多个超时边界事件（例如说，流程图中同时有【自动提醒】、【自动跳转】），只读取执行动作为【自动跳转】的
+     *
+     * @param userTask 用户任务
+     * @return 目标节点 Id；未配置时，返回 null
+     */
+    public static String parseTimeoutJumpNodeId(FlowElement userTask) {
+        if (!(userTask instanceof Activity activity)) {
+            return null;
+        }
+        BoundaryEvent boundaryEvent = CollUtil.findOne(activity.getBoundaryEvents(), event -> ObjUtil.equal(
+                BpmBoundaryEventTypeEnum.USER_TASK_TIMEOUT.getType(),
+                NumberUtils.parseInt(parseBoundaryEventExtensionElement(event, BOUNDARY_EVENT_TYPE)))
+                && ObjUtil.equal(BpmUserTaskTimeoutHandlerTypeEnum.AUTO_JUMP.getType(),
+                NumberUtils.parseInt(parseBoundaryEventExtensionElement(event, USER_TASK_TIMEOUT_HANDLER_TYPE))));
+        return parseBoundaryEventExtensionElement(boundaryEvent, USER_TASK_TIMEOUT_JUMP_NODE_ID);
+    }
+
     public static void addSignEnable(Boolean signEnable, FlowElement userTask) {
         addExtensionElement(userTask, SIGN_ENABLE,
                 ObjUtil.isNotNull(signEnable) ? signEnable.toString() : Boolean.FALSE.toString());
@@ -454,6 +495,54 @@ public class BpmnModelUtils {
             return ((FlowNode) source).getIncomingFlows();
         }
         return new ArrayList<>();
+    }
+
+    /**
+     * 根据节点，递归获取上游 source 为 UserTask 的入口连线
+     *
+     * 1. 如果当前节点的直接入口连线 source 就是 UserTask，则直接返回该连线
+     * 2. 如果当前节点的直接入口连线 source 不是 UserTask，则继续向上递归查找
+     * 3. 如果递归过程中遇到 StartEvent 或 SubProcess，则停止该分支继续向上查找
+     *
+     * @param source 起始节点
+     * @return 上游连接 UserTask 的入口连线列表
+     */
+    public static List<SequenceFlow> getElementIncomingUserTaskFlows(FlowElement source) {
+        List<SequenceFlow> result = new ArrayList<>();
+        collectElementIncomingUserTaskFlows(source, new HashSet<>(), new HashSet<>(), result);
+        return result;
+    }
+
+    private static void collectElementIncomingUserTaskFlows(FlowElement source, Set<String> visitedSequenceFlowIds,
+                                                            Set<String> resultSequenceFlowIds, List<SequenceFlow> result) {
+        // 如果是开始节点或子流程，则停止该分支向上查找
+        if (source == null || source instanceof StartEvent || source instanceof SubProcess) {
+            return;
+        }
+        // 获取入口连线
+        List<SequenceFlow> incomingFlows = getElementIncomingFlows(source);
+        if (CollUtil.isEmpty(incomingFlows)) {
+            return;
+        }
+
+        // 循环找到目标元素
+        for (SequenceFlow incomingFlow : incomingFlows) {
+            // 如果发现连线重复，说明连线已经走过。跳过
+            if (incomingFlow == null || !visitedSequenceFlowIds.add(incomingFlow.getId())) {
+                continue;
+            }
+            // 如果 source 是 UserTask，则添加到结果中
+            FlowElement sourceFlowElement = incomingFlow.getSourceFlowElement();
+            if (sourceFlowElement instanceof UserTask) {
+                if (resultSequenceFlowIds.add(incomingFlow.getId())) {
+                    result.add(incomingFlow);
+                }
+                continue;
+            }
+            // 递归向上查找 UserTask
+            collectElementIncomingUserTaskFlows(sourceFlowElement, visitedSequenceFlowIds,
+                    resultSequenceFlowIds, result);
+        }
     }
 
     /**
@@ -675,7 +764,9 @@ public class BpmnModelUtils {
             if (target.getId().equals(sourceFlowElement.getId())) {
                return true;
             }
-            // 如果目标节点为并行网关，跳过这个循环 (TODO 疑问：这个判断作用是防止回退到并行网关分支上的节点吗？）
+            // 遇到并行网关，不再向前查找：即不允许跨过 BPMN 并行网关（分支、汇聚）退回。
+            // 原因：退回只移动当前分支的执行，其它分支的执行仍然保留，会导致汇聚网关一直等待、或者后续节点重复执行
+            // 补充说明：SIMPLE 设计器的并行分支、包容分支使用的是包容网关，不受该限制
             if (sourceFlowElement instanceof ParallelGateway) {
                 continue;
             }
@@ -779,6 +870,44 @@ public class BpmnModelUtils {
         simulateNextFlowElements(startEvent, variables, resultElements, visitElements);
 
         // 将 EndEvent 放在末尾。原因是，DFS 遍历，可能 EndEvent 在 resultElements 中
+        List<FlowElement> endEvents = CollUtil.removeWithAddIf(resultElements,
+                flowElement -> flowElement instanceof EndEvent);
+        resultElements.addAll(endEvents);
+        return resultElements;
+    }
+
+    /**
+     * 模拟从指定节点之后的流程执行，获得接下来会执行的节点们；指定节点自身不包括在内
+     * <p>
+     * 用于退回、审批超时【自动跳转】后的预测：从进行中的节点开始，而不是从 StartEvent 开始。原因是：
+     * 1. 进行中的节点已经通过上游的网关，之后修改的流程变量（表单），从头预测可能走其它分支，展示错误的分支、漏掉实际的后续节点
+     * 2. 退回后，进行中的节点之后的节点会再次执行，即使历史中执行过，也需要预测
+     *
+     * @param bpmnModel  流程模型
+     * @param elementIds 指定节点的编号们，例如说进行中的节点
+     * @param variables  流程变量
+     * @return 节点们，按照遍历的顺序去重，EndEvent 放在末尾。指定节点在流程模型中都不存在时，返回 null
+     */
+    public static List<FlowElement> simulateProcessAfterElements(BpmnModel bpmnModel, Collection<String> elementIds,
+                                                                 Map<String, Object> variables) {
+        // 指定节点标记为已经遍历，避免循环回到它们
+        List<FlowNode> flowNodes = new ArrayList<>();
+        Set<FlowElement> visitElements = new HashSet<>();
+        elementIds.forEach(elementId -> {
+            if (getFlowElementById(bpmnModel, elementId) instanceof FlowNode flowNode
+                    && visitElements.add(flowNode)) {
+                flowNodes.add(flowNode);
+            }
+        });
+        if (flowNodes.isEmpty()) {
+            return null;
+        }
+
+        // 从指定节点的出口开始遍历
+        List<FlowElement> resultElements = new ArrayList<>();
+        flowNodes.forEach(flowNode -> flowNode.getOutgoingFlows().forEach(flow -> simulateNextFlowElements(
+                flow.getTargetFlowElement(), variables, resultElements, visitElements)));
+        // 将 EndEvent 放在末尾，与 simulateProcess 一致
         List<FlowElement> endEvents = CollUtil.removeWithAddIf(resultElements,
                 flowElement -> flowElement instanceof EndEvent);
         resultElements.addAll(endEvents);
@@ -910,13 +1039,88 @@ public class BpmnModelUtils {
     }
 
     /**
-     * 查找起始节点下一个用户任务列表列表
+     * 查找起始节点下一个用户任务列表, 该方法会递归向下查找：跳过非 UserTask 节点, 支持网关条件判断
+     *
+     * <ul>
+     *     <li>排他网关：走满足条件的唯一一条路径（含默认路径兜底）</li>
+     *     <li>包容网关：走所有满足条件的路径</li>
+     *     <li>并行网关：走所有出口路径</li>
+     * </ul>
+     *
+     * @param currentElement 当前节点
+     * @param bpmnModel      BPMN 模型
+     * @param variables      流程变量（用于网关条件判断）
+     * @return 下一个用户任务节点列表
+     */
+    public static List<UserTask> getNextUserTasks(FlowElement currentElement, BpmnModel bpmnModel,
+                                                      Map<String, Object> variables) {
+        return getNextUserTasks(currentElement, bpmnModel, variables, new HashSet<>(), new ArrayList<>());
+    }
+
+    private static List<UserTask> getNextUserTasks(FlowElement currentElement, BpmnModel bpmnModel,
+                                                       Map<String, Object> variables,
+                                                       Set<String> hasSequenceFlow, List<UserTask> userTaskList) {
+        // 1. 根据节点类型决定要遍历的出口连线
+        //    网关需要根据条件表达式筛选；其它节点直接取所有 outgoing flows
+        List<SequenceFlow> outgoingFlows;
+        if (currentElement instanceof Gateway) {
+            outgoingFlows = getGatewayOutgoingFlows((Gateway) currentElement, variables);
+        } else {
+            outgoingFlows = getElementOutgoingFlows(currentElement);
+        }
+        if (CollUtil.isEmpty(outgoingFlows)) {
+            return userTaskList;
+        }
+        // 2. 遍历出口连线，递归查找用户任务
+        for (SequenceFlow outgoingFlow : outgoingFlows) {
+            // 防止连线成环导致死循环
+            if (hasSequenceFlow.contains(outgoingFlow.getId())) {
+                continue;
+            }
+            hasSequenceFlow.add(outgoingFlow.getId());
+            // 获取目标节点
+            FlowElement targetElement = bpmnModel.getFlowElement(outgoingFlow.getTargetRef());
+            if (targetElement == null || targetElement instanceof EndEvent) {
+                continue;
+            }
+            if (targetElement instanceof UserTask) {
+                // 找到用户任务：加入结果
+                userTaskList.add((UserTask) targetElement);
+            } else {
+                // 非用户任务（网关、服务任务、中间事件等）：继续递归向下查找
+                getNextUserTasks(targetElement, bpmnModel, variables, hasSequenceFlow, userTaskList);
+            }
+        }
+        return userTaskList;
+    }
+
+    /**
+     * 根据网关类型与流程变量，筛选网关的出口连线
+     *
+     * @param gateway   网关节点
+     * @param variables 流程变量
+     * @return 命中的出口连线列表
+     */
+    private static List<SequenceFlow> getGatewayOutgoingFlows(Gateway gateway, Map<String, Object> variables) {
+        if (gateway instanceof ExclusiveGateway) {
+            SequenceFlow matchFlow = findMatchSequenceFlowByExclusiveGateway(gateway, variables);
+            return matchFlow == null ? Collections.emptyList() : Collections.singletonList(matchFlow);
+        }
+        if (gateway instanceof InclusiveGateway) {
+            return new ArrayList<>(findMatchSequenceFlowsByInclusiveGateway(gateway, variables));
+        }
+        // 默认（并行网关等）：走所有出口
+        return gateway.getOutgoingFlows();
+    }
+
+    /**
+     * 查找起始节点下一个用户任务列表列表, 不判断网关条件
      *
      * @param source 起始节点
      * @return 结果
      */
     public static List<UserTask> getNextUserTasks(FlowElement source) {
-        return getNextUserTasks(source, null, null);
+        return getNextUserTasks(source, new HashSet<>(), new ArrayList<>());
     }
 
     /**

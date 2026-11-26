@@ -1,9 +1,9 @@
 package cn.iocoder.yudao.module.iot.core.mq.message;
 
-import cn.hutool.core.map.MapUtil;
 import cn.iocoder.yudao.framework.common.exception.enums.GlobalErrorCodeConstants;
 import cn.iocoder.yudao.module.iot.core.enums.IotDeviceMessageMethodEnum;
-import cn.iocoder.yudao.module.iot.core.enums.IotDeviceStateEnum;
+import cn.iocoder.yudao.module.iot.core.enums.device.IotDeviceStateEnum;
+import cn.iocoder.yudao.module.iot.core.topic.state.IotDeviceStateUpdateReqDTO;
 import cn.iocoder.yudao.module.iot.core.util.IotDeviceMessageUtils;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -60,7 +60,7 @@ public class IotDeviceMessage {
      */
     private String serverId;
 
-    // ========== codec（编解码）字段 ==========
+    // ========== serialize（序列化）相关字段 ==========
 
     /**
      * 请求编号
@@ -72,7 +72,7 @@ public class IotDeviceMessage {
      * 请求方法
      *
      * 枚举 {@link IotDeviceMessageMethodEnum}
-     * 例如说：thing.property.report 属性上报
+     * 例如说：thing.property.post 属性上报
      */
     private String method;
     /**
@@ -94,7 +94,26 @@ public class IotDeviceMessage {
      */
     private String msg;
 
-    // ========== 基础方法：只传递"codec（编解码）字段" ==========
+    // ========== 透传（raw）相关字段 ==========
+
+    /**
+     * 与设备之间实际收发的原始字节（Base64）
+     *
+     * 只由服务端可信赋值：网关的透传上行（解析成功的业务消息、或未解析的 thing.raw.post）、Modbus 设备的实际响应，
+     * 以及 biz 下发的 thing.raw.push；设备经标准路径上报的消息，网关会清空该字段
+     */
+    private String raw;
+
+    // ========== 离线暂存（spool）相关字段 ==========
+
+    /**
+     * 网关接收时刻（毫秒时间戳），与 {@link #reportTime} 是同一次取样；非空表示该消息经网关的离线暂存（SQLite）补传
+     *
+     * 只由网关可信赋值：设备、数据解析脚本带上的一律清空；批量上报（pack）拆出的子消息，沿用 pack 的值
+     */
+    private Long spoolTime;
+
+    // ========== 基础方法：只传递"serialize（序列化）相关字段" ==========
 
     public static IotDeviceMessage requestOf(String method) {
         return requestOf(null, method, null);
@@ -106,6 +125,23 @@ public class IotDeviceMessage {
 
     public static IotDeviceMessage requestOf(String requestId, String method, Object params) {
         return of(requestId, method, params, null, null, null);
+    }
+
+    /**
+     * 创建设备请求消息（包含设备信息）
+     *
+     * @param deviceId 设备编号
+     * @param tenantId 租户编号
+     * @param serverId 服务标识
+     * @param method   消息方法
+     * @param params   消息参数
+     * @return 消息对象
+     */
+    public static IotDeviceMessage requestOf(Long deviceId, Long tenantId, String serverId,
+                                             String method, Object params) {
+        IotDeviceMessage message = of(null, method, params, null, null, null);
+        return message.setId(IotDeviceMessageUtils.generateMessageId())
+                .setDeviceId(deviceId).setTenantId(tenantId).setServerId(serverId);
     }
 
     public static IotDeviceMessage replyOf(String requestId, String method,
@@ -132,20 +168,12 @@ public class IotDeviceMessage {
 
     public static IotDeviceMessage buildStateUpdateOnline() {
         return requestOf(IotDeviceMessageMethodEnum.STATE_UPDATE.getMethod(),
-                MapUtil.of("state", IotDeviceStateEnum.ONLINE.getState()));
+                new IotDeviceStateUpdateReqDTO(IotDeviceStateEnum.ONLINE.getState()));
     }
 
     public static IotDeviceMessage buildStateOffline() {
         return requestOf(IotDeviceMessageMethodEnum.STATE_UPDATE.getMethod(),
-                MapUtil.of("state", IotDeviceStateEnum.OFFLINE.getState()));
-    }
-
-    public static IotDeviceMessage buildOtaUpgrade(String version, String fileUrl, Long fileSize,
-                                                   String fileDigestAlgorithm, String fileDigestValue) {
-        return requestOf(IotDeviceMessageMethodEnum.OTA_UPGRADE.getMethod(), MapUtil.builder()
-                .put("version", version).put("fileUrl", fileUrl).put("fileSize", fileSize)
-                .put("fileDigestAlgorithm", fileDigestAlgorithm).put("fileDigestValue", fileDigestValue)
-                .build());
+                new IotDeviceStateUpdateReqDTO(IotDeviceStateEnum.OFFLINE.getState()));
     }
 
 }

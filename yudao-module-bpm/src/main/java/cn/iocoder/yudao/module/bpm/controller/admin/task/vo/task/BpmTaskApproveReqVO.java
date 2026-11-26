@@ -21,10 +21,16 @@ public class BpmTaskApproveReqVO {
     @Schema(description = "签名", example = "https://www.iocoder.cn/sign.png")
     private String signPicUrl;
 
+    @Schema(description = "附件", example = "[https://test.yudao.iocoder.cn/20260609/test.txt]")
+    private List<String> attachments;
+
     @Schema(description = "变量实例（动态表单）", requiredMode = Schema.RequiredMode.REQUIRED)
     private Map<String, Object> variables;
 
     @Schema(description = "下一个节点审批人", example = "{nodeId:[1, 2]}")
     private Map<String, List<Long>> nextAssignees; // 为什么是 Map，而不是 List 呢？因为下一个节点可能是多个，例如说并行网关的情况
+
+    @Schema(description = "退回修改的批次编号，来自待办任务。任务退回修改过时必须传递", example = "a1b2c3")
+    private String revisionId;
 
 }

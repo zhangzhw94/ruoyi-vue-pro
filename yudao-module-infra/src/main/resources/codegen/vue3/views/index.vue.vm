@@ -16,7 +16,9 @@
             #set ($AttrName = $column.javaField.substring(0,1).toUpperCase() + ${column.javaField.substring(1)})
             #set ($comment = $column.columnComment)
             #set ($dictMethod = "getDictOptions")## 计算使用哪个 dict 字典方法
-            #if ($javaType == "Integer" || $javaType == "Long" || $javaType == "Byte" || $javaType == "Short")
+            #if ($codegenHelper.isLongCollection($column))## Long 集合：使用字符串的字典值，避免超过 JS 安全整数后精度丢失
+                #set ($dictMethod = "getStrDictOptions")
+            #elseif ($javaType == "Integer" || $javaType == "Long" || $javaType == "Byte" || $javaType == "Short")
                 #set ($dictMethod = "getIntDictOptions")
             #elseif ($javaType == "String")
                 #set ($dictMethod = "getStrDictOptions")
@@ -33,7 +35,7 @@
           class="!w-240px"
         />
       </el-form-item>
-            #elseif ($column.htmlType == "select" || $column.htmlType == "radio")
+            #elseif ($column.htmlType == "select" || $column.htmlType == "radio" || $codegenHelper.isCollection($column))## 集合字段：单选一个元素，查询包含该元素的记录
       <el-form-item label="${comment}" prop="${javaField}">
         <el-select
           v-model="queryParams.${javaField}"
@@ -44,7 +46,7 @@
                 #if ("" != $dictType)## 设置了 dictType 数据字典的情况
           <el-option
             v-for="dict in $dictMethod(DICT_TYPE.$dictType.toUpperCase())"
-            :key="dict.value"
+            :key="#if ($column.javaType == 'Boolean')String(dict.value)#{else}dict.value#end"
             :label="dict.label"
             :value="dict.value"
           />
@@ -92,6 +94,16 @@
         >
           <Icon icon="ep:plus" class="mr-5px" /> 新增
         </el-button>
+#if ($importEnable)
+        <el-button
+          type="warning"
+          plain
+          @click="handleImport"
+          v-hasPermi="['${permissionPrefix}:import']"
+        >
+          <Icon icon="ep:upload" class="mr-5px" /> 导入
+        </el-button>
+#end
         <el-button
           type="success"
           plain
@@ -237,6 +249,11 @@
       @pagination="getList"
     />
   </ContentWrap>
+#if ($importEnable)
+
+  <!-- 导入弹窗 -->
+  <${simpleClassName}ImportForm ref="importRef" @success="getList" />
+#end
 
   <!-- 表单弹窗：添加/修改 -->
   <${simpleClassName}Form ref="formRef" @success="getList" />
@@ -263,6 +280,9 @@
 import { getIntDictOptions, getStrDictOptions, getBoolDictOptions, DICT_TYPE } from '@/utils/dict'
 import { isEmpty } from '@/utils/is'
 import { dateFormatter } from '@/utils/formatTime'
+#if ($importEnable)
+import ${simpleClassName}ImportForm from './${simpleClassName}ImportForm.vue'
+#end
 ## 特殊：树表专属逻辑
 #if ( $table.templateType == 2 )
 import { handleTree } from '@/utils/tree'
@@ -297,17 +317,19 @@ const queryParams = reactive({
 #end
   #foreach ($column in $columns)
     #if ($column.listOperation)
-      #if ($column.listOperationCondition != 'BETWEEN')
-  $column.javaField: undefined,
-  #end
-      #if ($column.htmlType == "datetime" || $column.listOperationCondition == "BETWEEN")
+      #if ($column.listOperationCondition == "BETWEEN" && !$codegenHelper.isCollection($column))## 范围查询：使用数组
   $column.javaField: [],
+      #else
+  $column.javaField: undefined,
       #end
     #end
   #end
 })
 const queryFormRef = ref() // 搜索的表单
 const exportLoading = ref(false) // 导出的加载中
+#if ($importEnable)
+const importRef = ref() // ${table.classComment} 导入组件的 Ref
+#end
 
 /** 查询列表 */
 const getList = async () => {
@@ -344,6 +366,13 @@ const formRef = ref()
 const openForm = (type: string, id?: number) => {
   formRef.value.open(type, id)
 }
+#if ($importEnable)
+
+/** 导入按钮操作 */
+const handleImport = () => {
+  importRef.value.open()
+}
+#end
 
 /** 删除按钮操作 */
 const handleDelete = async (id: number) => {
@@ -398,7 +427,7 @@ const handleExport = async () => {
 #if ( $table.templateType == 11 )
 
 /** 选中行操作 */
-const currentRow = ref({}) // 选中行
+const currentRow = ref<Partial<${simpleClassName}>>({}) // 选中行
 const handleCurrentChange = (row) => {
   currentRow.value = row
 }

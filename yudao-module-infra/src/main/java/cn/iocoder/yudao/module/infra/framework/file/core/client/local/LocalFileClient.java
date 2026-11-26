@@ -3,8 +3,15 @@ package cn.iocoder.yudao.module.infra.framework.file.core.client.local;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.io.IORuntimeException;
 import cn.iocoder.yudao.module.infra.framework.file.core.client.AbstractFileClient;
+import cn.iocoder.yudao.module.infra.framework.file.core.utils.FilePathUtils;
 
 import java.io.File;
+import java.io.InputStream;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
+import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
+import static cn.iocoder.yudao.module.infra.enums.ErrorCodeConstants.FILE_PATH_INVALID;
 
 /**
  * 本地文件客户端
@@ -31,6 +38,15 @@ public class LocalFileClient extends AbstractFileClient<LocalFileClientConfig> {
     }
 
     @Override
+    public String upload(InputStream content, long size, String path, String type) {
+        // 边读边写到目标文件
+        String filePath = getFilePath(path);
+        FileUtil.writeFromStream(content, FileUtil.file(filePath), false);
+        // 拼接返回路径
+        return super.formatFileUrl(config.getDomain(), path);
+    }
+
+    @Override
     public void delete(String path) {
         String filePath = getFilePath(path);
         FileUtil.del(filePath);
@@ -49,8 +65,23 @@ public class LocalFileClient extends AbstractFileClient<LocalFileClientConfig> {
         }
     }
 
+    @Override
+    public InputStream getStream(String path) {
+        File file = new File(getFilePath(path));
+        if (!file.isFile()) {
+            return null;
+        }
+        return FileUtil.getInputStream(file);
+    }
+
     private String getFilePath(String path) {
-        return config.getBasePath() + File.separator + path;
+        FilePathUtils.validatePath(path);
+        Path basePath = Paths.get(config.getBasePath()).toAbsolutePath().normalize();
+        Path filePath = basePath.resolve(path).normalize();
+        if (!filePath.startsWith(basePath)) {
+            throw exception(FILE_PATH_INVALID);
+        }
+        return filePath.toString();
     }
 
 }

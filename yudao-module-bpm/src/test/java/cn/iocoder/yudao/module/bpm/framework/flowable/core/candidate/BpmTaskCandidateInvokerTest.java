@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.bpm.framework.flowable.core.candidate;
 
+import cn.hutool.core.collection.ListUtil;
 import cn.hutool.core.map.MapUtil;
 import cn.hutool.extra.spring.SpringUtil;
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
@@ -10,7 +11,7 @@ import cn.iocoder.yudao.module.bpm.framework.flowable.core.candidate.strategy.us
 import cn.iocoder.yudao.module.bpm.framework.flowable.core.enums.BpmTaskCandidateStrategyEnum;
 import cn.iocoder.yudao.module.bpm.framework.flowable.core.enums.BpmnModelConstants;
 import cn.iocoder.yudao.module.bpm.framework.flowable.core.util.BpmnModelUtils;
-import cn.iocoder.yudao.module.bpm.service.task.BpmProcessInstanceService;
+import cn.iocoder.yudao.module.bpm.service.task.BpmProcessInstanceQueryService;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import org.flowable.bpmn.model.BpmnModel;
@@ -48,12 +49,12 @@ public class BpmTaskCandidateInvokerTest extends BaseMockitoUnitTest {
 
     @Mock
     private AdminUserApi adminUserApi;
-
     @Mock
-    private BpmProcessInstanceService processInstanceService;
+    private BpmProcessInstanceQueryService processInstanceQueryService;
 
     @Spy
     private BpmTaskCandidateStrategy userStrategy;
+
     @Mock
     private BpmTaskCandidateAssignEmptyStrategy emptyStrategy;
 
@@ -64,7 +65,7 @@ public class BpmTaskCandidateInvokerTest extends BaseMockitoUnitTest {
     public void setUp() {
         userStrategy = new BpmTaskCandidateUserStrategy(); // 创建 strategy 实例
         when(emptyStrategy.getStrategy()).thenReturn(BpmTaskCandidateStrategyEnum.ASSIGN_EMPTY);
-        strategyList = List.of(userStrategy, emptyStrategy); // 创建 strategyList
+        strategyList = ListUtil.of(userStrategy, emptyStrategy); // 创建 strategyList
         taskCandidateInvoker = new BpmTaskCandidateInvoker(strategyList, adminUserApi);
     }
 
@@ -95,10 +96,10 @@ public class BpmTaskCandidateInvokerTest extends BaseMockitoUnitTest {
                     .put(user2.getId(), user2).build();
             when(adminUserApi.getUserMap(eq(asSet(1L, 2L)))).thenReturn(userMap);
             // mock 移除发起人的用户
-            springUtilMockedStatic.when(() -> SpringUtil.getBean(BpmProcessInstanceService.class))
-                    .thenReturn(processInstanceService);
+            springUtilMockedStatic.when(() -> SpringUtil.getBean(BpmProcessInstanceQueryService.class))
+                    .thenReturn(processInstanceQueryService);
             ProcessInstance processInstance = mock(ProcessInstance.class);
-            when(processInstanceService.getProcessInstance(eq(processInstanceId))).thenReturn(processInstance);
+            when(processInstanceQueryService.getProcessInstance(eq(processInstanceId))).thenReturn(processInstance);
             when(processInstance.getStartUserId()).thenReturn("1");
             mockFlowElementExtensionElement(userTask, BpmnModelConstants.USER_TASK_ASSIGN_START_USER_HANDLER_TYPE,
                     String.valueOf(BpmUserTaskAssignStartUserHandlerTypeEnum.SKIP.getType()));
@@ -140,10 +141,10 @@ public class BpmTaskCandidateInvokerTest extends BaseMockitoUnitTest {
             when(emptyStrategy.calculateUsersByTask(same(execution), same(param)))
                     .thenReturn(Sets.newSet(2L));
             // mock 移除发起人的用户
-            springUtilMockedStatic.when(() -> SpringUtil.getBean(BpmProcessInstanceService.class))
-                    .thenReturn(processInstanceService);
+            springUtilMockedStatic.when(() -> SpringUtil.getBean(BpmProcessInstanceQueryService.class))
+                    .thenReturn(processInstanceQueryService);
             ProcessInstance processInstance = mock(ProcessInstance.class);
-            when(processInstanceService.getProcessInstance(eq(processInstanceId))).thenReturn(processInstance);
+            when(processInstanceQueryService.getProcessInstance(eq(processInstanceId))).thenReturn(processInstance);
             when(processInstance.getStartUserId()).thenReturn("1");
 
             // 调用

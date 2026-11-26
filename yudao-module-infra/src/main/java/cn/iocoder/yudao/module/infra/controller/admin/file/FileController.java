@@ -1,10 +1,10 @@
 package cn.iocoder.yudao.module.infra.controller.admin.file;
 
-import cn.hutool.core.io.IoUtil;
+import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.StrUtil;
-import cn.hutool.core.util.URLUtil;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.framework.common.util.http.HttpUtils;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.framework.tenant.core.aop.TenantIgnore;
 import cn.iocoder.yudao.module.infra.controller.admin.file.vo.file.*;
@@ -27,7 +27,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.nio.charset.StandardCharsets;
+import java.io.InputStream;
 import java.util.List;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
@@ -49,9 +49,11 @@ public class FileController {
             schema = @Schema(type = "string", format = "binary"))
     public CommonResult<String> uploadFile(@Valid FileUploadReqVO uploadReqVO) throws Exception {
         MultipartFile file = uploadReqVO.getFile();
-        byte[] content = IoUtil.readBytes(file.getInputStream());
-        return success(fileService.createFile(content, file.getOriginalFilename(),
-                uploadReqVO.getDirectory(), file.getContentType()));
+        // 边读边写到文件存储器，不把整个文件读入内存
+        try (InputStream content = file.getInputStream()) {
+            return success(fileService.createFile(content, file.getSize(), file.getOriginalFilename(),
+                    uploadReqVO.getDirectory(), file.getContentType()));
+        }
     }
 
     @GetMapping("/presigned-url")
@@ -111,19 +113,22 @@ public class FileController {
         if (StrUtil.isEmpty(path)) {
             throw new IllegalArgumentException("结尾的 path 路径必须传递");
         }
-        // 解码，解决中文路径的问题
+        // 解码，解决中文、%、+ 等特殊字符路径的问题
         // https://gitee.com/zhijiantianya/ruoyi-vue-pro/pulls/807/
         // https://gitee.com/zhijiantianya/ruoyi-vue-pro/pulls/1432/
-        path = URLUtil.decode(path, StandardCharsets.UTF_8, false);
+        path = HttpUtils.decodeUrlPath(path);
 
-        // 读取内容
-        byte[] content = fileService.getFileContent(configId, path);
-        if (content == null) {
-            log.warn("[getFileContent][configId({}) path({}) 文件不存在]", configId, path);
-            response.setStatus(HttpStatus.NOT_FOUND.value());
-            return;
+        // 打开文件流，边读边写；输出完成、失败或客户端中断时都会关闭文件流
+        try (InputStream content = fileService.getFileStream(configId, path)) {
+            if (content == null) {
+                log.warn("[getFileContent][configId({}) path({}) 文件不存在]", configId, path);
+                response.setStatus(HttpStatus.NOT_FOUND.value());
+                return;
+            }
+            FileDO file = fileService.getFileByConfigIdAndPath(configId, path);
+            String filename = file != null && StrUtil.isNotEmpty(file.getName()) ? file.getName() : FileUtil.getName(path);
+            writeAttachment(response, filename, content);
         }
-        writeAttachment(response, path, content);
     }
 
     @GetMapping("/page")

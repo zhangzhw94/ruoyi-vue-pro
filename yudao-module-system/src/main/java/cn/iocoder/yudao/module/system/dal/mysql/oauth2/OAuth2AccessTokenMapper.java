@@ -6,9 +6,12 @@ import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.framework.tenant.core.aop.TenantIgnore;
 import cn.iocoder.yudao.module.system.controller.admin.oauth2.vo.token.OAuth2AccessTokenPageReqVO;
 import cn.iocoder.yudao.module.system.dal.dataobject.oauth2.OAuth2AccessTokenDO;
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 
 @Mapper
@@ -36,5 +39,22 @@ public interface OAuth2AccessTokenMapper extends BaseMapperX<OAuth2AccessTokenDO
         return selectList(OAuth2AccessTokenDO::getUserId, userId,
                 OAuth2AccessTokenDO::getUserType, userType);
     }
+
+    default List<OAuth2AccessTokenDO> selectListByUserIdsAndUserType(Collection<Long> userIds, Integer userType) {
+        return selectList(new LambdaQueryWrapperX<OAuth2AccessTokenDO>()
+                .select(OAuth2AccessTokenDO::getId, OAuth2AccessTokenDO::getAccessToken, OAuth2AccessTokenDO::getRefreshToken)
+                .in(OAuth2AccessTokenDO::getUserId, userIds)
+                .eq(OAuth2AccessTokenDO::getUserType, userType));
+    }
+
+    /**
+     * 物理删除指定过期时间之前的访问令牌
+     *
+     * @param expiresTime 最大时间
+     * @param limit       删除条数，防止一次删除太多
+     * @return 删除条数
+     */
+    @Delete("${@cn.iocoder.yudao.framework.mybatis.core.util.SqlDialectUtils@deleteBatchByLessThan('system_oauth2_access_token', 'expires_time', 'expiresTime', 'limit')}")
+    Integer deleteByExpiresTimeLt(@Param("expiresTime") LocalDateTime expiresTime, @Param("limit") Integer limit);
 
 }
